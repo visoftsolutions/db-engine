@@ -1,0 +1,16 @@
+services:
+  surrealdb:
+    container_name: db-engine-surrealdb
+    hostname: db-engine-surrealdb
+    image: surrealdb/surrealdb:latest
+    env_file:
+      - .env
+    entrypoint: 
+      - /surreal 
+      - start 
+      - --user
+      - $DB_USERNAME
+      - --pass
+      - $DB_PASSWORD
+    ports:
+      - 8000:8000
