@@ -1,14 +1,14 @@
 use proc_macro2::Span;
 use quote::{quote, format_ident};
 
-pub struct StructBuilder {
+pub struct StructSyntaxBuilder {
     name: String,
     fields: Vec<(String, String)>,
 }
 
-impl StructBuilder {
+impl StructSyntaxBuilder {
     pub fn new(name: &str) -> Self {
-        StructBuilder {
+        StructSyntaxBuilder {
             name: name.to_string(),
             fields: Vec::new(),
         }
@@ -45,7 +45,7 @@ mod tests {
 
     #[test]
     fn test_generate_code() {
-        let code = StructBuilder::new("Person")
+        let code = StructSyntaxBuilder::new("Person")
             .add_field("name", "String")
             .add_field("age", "i32")
             .to_string();
