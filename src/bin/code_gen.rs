@@ -1,4 +1,21 @@
+use std::fs::File;
+use std::io::Write;
 
-fn main(){
-    println!("Hello World");
+use db_engine::{db_class::DbClass, db_field::DbClassSimpleField as SF, db_manager::DbManager};
+
+fn main() {
+    let manager = DbManager::new().add_class(
+        DbClass::with_name("User")
+            .add_field(SF::new("name", "String"))
+            .add_field(SF::new("email", "String"))
+            .add_field(SF::new("age", "u16")),
+    );
+    let tokens = manager.to_tokens();
+    let code = prettyplease::unparse(&syn::parse2(tokens).unwrap());
+    let path = "src/bin/generated/types.rs";
+    File::create(path)
+        .unwrap()
+        .write_all(code.as_bytes())
+        .unwrap();
+    println!("Written to file: {}", path);
 }
