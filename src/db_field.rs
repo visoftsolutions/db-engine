@@ -1,10 +1,19 @@
 use crate::db_class::DbClassIdentifier;
 
-
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub struct DbClassSimpleField {
-    name: String,
-    type_: String
+    pub name: String,
+    pub type_: String,
+}
+
+impl DbClassSimpleField {
+    pub fn new(name: &str, type_: &str) -> DbClassField {
+        DbClassSimpleField {
+            name: name.to_string(),
+            type_: type_.to_string(),
+        }
+        .into()
+    }
 }
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub struct DbClassLinkSingle(DbClassIdentifier);
@@ -15,5 +24,11 @@ pub struct DbClassLinkMultiple(DbClassIdentifier);
 pub enum DbClassField {
     Simple(DbClassSimpleField),
     LinkSingle(DbClassLinkSingle),
-    LinkMultiple(DbClassLinkMultiple)
+    LinkMultiple(DbClassLinkMultiple),
+}
+
+impl From<DbClassSimpleField> for DbClassField {
+    fn from(value: DbClassSimpleField) -> Self {
+        DbClassField::Simple(value)
+    }
 }

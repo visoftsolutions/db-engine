@@ -1,4 +1,5 @@
-pub mod syntax_builder;
+pub mod db_class;
+pub mod db_field;
 pub mod db_manager;
-mod db_field;
-mod db_class;
+pub mod syntax;
+pub mod syntax_builder;

@@ -1,21 +1,31 @@
-use crate::db_field::{DbClassLinkSingle, DbClassField};
+use crate::{
+    db_field::{DbClassField, DbClassLinkSingle},
+    syntax::struct_builder::StructSyntaxBuilder,
+};
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub enum DbClassExtension {
     Custom(DbClassIdentifier),
-    SimpleFill(DbClassLinkSingle)
+    SimpleFill(DbClassLinkSingle),
 }
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub struct DbClass {
     ident: DbClassIdentifier,
     extends: Vec<DbClassExtension>,
-    fields: Vec<DbClassField>
-} 
+    fields: Vec<DbClassField>,
+}
 
 impl DbClass {
     pub fn new(ident: DbClassIdentifier) -> Self {
-        DbClass { ident, extends: vec![], fields: vec![] }
+        DbClass {
+            ident,
+            extends: vec![],
+            fields: vec![],
+        }
+    }
+    pub fn with_name(name: &str) -> Self {
+        DbClass::new(DbClassIdentifier::new(name.to_string()))
     }
     pub fn add_field(mut self, field: DbClassField) -> Self {
         self.fields.push(field);
@@ -24,9 +34,9 @@ impl DbClass {
 }
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
-pub struct DbClassIdentifier{
-    name: String,
-    hash: String
+pub struct DbClassIdentifier {
+    pub name: String,
+    hash: String,
 }
 
 impl DbClassIdentifier {
@@ -35,5 +45,18 @@ impl DbClassIdentifier {
     }
     pub fn with_hash(name: String, hash: String) -> Self {
         DbClassIdentifier { name, hash }
+    }
+}
+
+impl From<DbClass> for StructSyntaxBuilder {
+    fn from(value: DbClass) -> Self {
+        let mut s = StructSyntaxBuilder::new(&value.ident.name);
+        s.add_field("id", "String");
+        for field in value.fields {
+            if let DbClassField::Simple(f) = field {
+                s.add_field(&f.name, &f.type_);
+            }
+        }
+        s
     }
 }
