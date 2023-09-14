@@ -1,9 +1,37 @@
 use proc_macro2::{Span, TokenStream, Ident};
 use quote::{format_ident, quote};
 
+pub struct Field {
+    name: String,
+    field_type: String,
+    decorators: Vec<String>,
+}
+
+impl Field {
+    pub fn with_decorators(name: impl Into<String>, field_type: impl Into<String>, decorators: Vec<impl Into<String>>) -> Self {
+        Field {
+            name: name.into(),
+            field_type: field_type.into(),
+            decorators: decorators.into_iter().map(|d| d.into()).collect(),
+        }
+    }
+    pub fn new(name: impl Into<String>, field_type: impl Into<String>) -> Self {
+        Field::with_decorators(name, field_type, vec![] as Vec<String>)
+    }
+    pub fn to_tokens(&self) -> TokenStream {
+        let name_iden = format_ident!("{}", self.name);
+        let type_iden = format_ident!("{}", self.field_type);
+        let decorators = &self.decorators.iter().map(|d| d.parse::<TokenStream>().unwrap()).collect::<Vec<_>>();
+        quote! {
+            #(#decorators)*
+            pub #name_iden: #type_iden
+        }
+    }
+}
+
 pub struct StructSyntaxBuilder {
     name: String,
-    fields: Vec<(String, String)>,
+    fields: Vec<Field>,
 }
 
 impl StructSyntaxBuilder {
@@ -14,26 +42,18 @@ impl StructSyntaxBuilder {
         }
     }
 
-    pub fn add_field(&mut self, name: &str, field_type: &str) -> &mut Self {
-        self.fields.push((name.to_string(), field_type.to_string()));
+    pub fn add_field(&mut self, field: Field) -> &mut Self {
+        self.fields.push(field);
         self
     }
 
     fn name_iden(&self) -> Ident {
-        syn::Ident::new(&&self.name, Span::call_site())
+        syn::Ident::new(&self.name, Span::call_site())
     }
 
     pub fn to_tokens(&self) -> TokenStream {
         let name_iden = self.name_iden();
-        let field_defs: Vec<_> = self
-            .fields
-            .iter()
-            .map(|(field_name, field_type)| {
-                let name_iden = format_ident!("{}", field_name);
-                let type_iden = format_ident!("{}", field_type);
-                quote! { pub #name_iden: #type_iden }
-            })
-            .collect();
+        let field_defs: Vec<_> = self.fields.iter().map(Field::to_tokens).collect();
 
         quote! {
             #[derive(Debug, Serialize, Deserialize)]
@@ -51,8 +71,8 @@ mod tests {
     #[test]
     fn test_generate_code() {
         let tokens = StructSyntaxBuilder::new("Person")
-            .add_field("name", "String")
-            .add_field("age", "i32")
+            .add_field(Field::new("name", "String"))
+            .add_field(Field::new("age", "i32"))
             .to_tokens();
         let code = prettyplease::unparse(&syn::parse2(tokens).unwrap());
         assert_eq!(

@@ -41,13 +41,21 @@ impl DbManager {
             .collect::<Vec<_>>();
         quote! {
             use surrealdb::{Surreal, engine::remote::ws::Client};
-            use serde::{Deserialize, Serialize};
+            use serde::{Deserialize, Serialize, Deserializer};
             use surrealdb::sql::Thing;
 
             #[derive(Debug, Deserialize)]
             struct Record {
                 #[allow(dead_code)]
                 id: Thing,
+            }
+
+            fn thing_to_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                let original_value: Thing = Deserialize::deserialize(deserializer)?;
+                Ok(original_value.id.to_string())
             }
 
             #(#struct_tokens)*
