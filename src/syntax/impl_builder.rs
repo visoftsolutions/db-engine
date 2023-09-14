@@ -3,18 +3,18 @@ use quote::{format_ident, quote};
 
 use crate::{db_class::DbClass, syntax::string_to_iden, db_field::DbClassField};
 
-use super::struct_builder::StructSyntaxBuilder;
+use super::struct_builder::{StructSyntaxBuilder, Field};
 
 impl DbClass {
     pub fn to_id_struct_tokens(&self) -> TokenStream {
-        StructSyntaxBuilder::new(&self.id_struct_name()).add_field("id", "String").to_tokens()
+        StructSyntaxBuilder::new(&self.id_struct_name()).add_field(Field::with_decorators("id", "String", vec!["#[serde(deserialize_with = \"thing_to_string\")]"])).to_tokens()
     }
     pub fn to_create_struct_tokens(&self) -> TokenStream {
         let mut s = StructSyntaxBuilder::new(&self.create_struct_name());
 
         for field in &self.fields {
             if let DbClassField::Simple(f) = field {
-                s.add_field(&f.name, &f.type_);
+                s.add_field(Field::new(&f.name, &f.type_));
             }
         }
         s.to_tokens()
@@ -28,11 +28,10 @@ impl DbClass {
         quote! {
             impl #create_struct_iden {
                 pub async fn db_create(&self, db: &Surreal<Client>) -> surrealdb::Result<Vec<#id_struct_iden>> {
-                    let created: Vec<Record> = db
+                    db
                         .create(#db_iden_str)
                         .content(self)
-                        .await?;
-                    Ok(created.into_iter().map(|c| #id_struct_iden{id: c.id.id.to_string()}).collect())
+                        .await
                 }
             }
 

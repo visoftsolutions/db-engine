@@ -1,6 +1,6 @@
 use crate::{
     db_field::{DbClassField, DbClassLinkSingle},
-    syntax::struct_builder::StructSyntaxBuilder,
+    syntax::struct_builder::{StructSyntaxBuilder, Field},
 };
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
@@ -57,10 +57,10 @@ impl DbClassIdentifier {
 impl From<&DbClass> for StructSyntaxBuilder {
     fn from(value: &DbClass) -> Self {
         let mut s = StructSyntaxBuilder::new(&value.ident.name);
-        s.add_field("id", "Thing");
+        s.add_field(Field::with_decorators("id", "String", vec!["#[serde(deserialize_with = \"thing_to_string\")]"]));
         for field in &value.fields {
             if let DbClassField::Simple(f) = field {
-                s.add_field(&f.name, &f.type_);
+                s.add_field(Field::new(&f.name, &f.type_));
             }
         }
         s
