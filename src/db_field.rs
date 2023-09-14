@@ -16,7 +16,11 @@ impl DbClassSimpleField {
     }
 }
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
-pub struct DbClassLinkSingle(DbClassIdentifier);
+pub struct DbClassLinkSingle{
+    pub name: String,
+    pub ident: DbClassIdentifier,
+    pub prefetch: bool
+}
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub struct DbClassLinkMultiple(DbClassIdentifier);
 

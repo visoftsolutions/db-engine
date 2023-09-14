@@ -31,15 +31,18 @@ impl DbClass {
         self.fields.push(field);
         self
     }
-    pub fn id_struct_name(&self) -> String {
-        self.ident.name.clone() + "Id"
-    }
-    pub fn value_struct_name(&self) -> String {
-        "Value".to_string() + &self.ident.name
-    }
     pub fn simple_fields(&self) -> Vec<DbClassSimpleField> {
         self.fields.iter().filter_map(|f| {
             if let DbClassField::Simple(i) = f {
+                Some(i.clone())
+            } else {
+                None
+            }
+        }).collect()
+    }
+    pub fn link_single_fields(&self) -> Vec<DbClassLinkSingle> {
+        self.fields.iter().filter_map(|f| {
+            if let DbClassField::LinkSingle(i) = f {
                 Some(i.clone())
             } else {
                 None
@@ -61,17 +64,11 @@ impl DbClassIdentifier {
     pub fn with_hash(name: String, hash: String) -> Self {
         DbClassIdentifier { name, hash }
     }
-}
-
-impl From<&DbClass> for StructSyntaxBuilder {
-    fn from(value: &DbClass) -> Self {
-        let mut s = StructSyntaxBuilder::new(&value.ident.name);
-        s.add_field(Field::with_decorators("id", "String", vec!["#[serde(deserialize_with = \"thing_to_string\")]"]));
-        for field in &value.fields {
-            if let DbClassField::Simple(f) = field {
-                s.add_field(Field::new(&f.name, &f.type_));
-            }
-        }
-        s
+    pub fn id_struct_name(&self) -> String {
+        self.name.clone() + "Id"
+    }
+    pub fn value_struct_name(&self) -> String {
+        "Value".to_string() + &self.name
     }
 }
+
