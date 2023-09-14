@@ -6,22 +6,42 @@ use crate::{db_class::DbClass, syntax::string_to_iden, db_field::DbClassField};
 use super::struct_builder::{StructSyntaxBuilder, Field};
 
 impl DbClass {
-    pub fn to_id_struct_tokens(&self) -> TokenStream {
-        StructSyntaxBuilder::new(&self.id_struct_name()).add_field(Field::with_decorators("id", "String", vec!["#[serde(deserialize_with = \"thing_to_string\")]"])).to_tokens()
+    pub fn to_main_builder(&self) -> StructSyntaxBuilder {
+        self.add_fields(self.id_builder(&self.ident.name))
     }
-    pub fn to_value_struct_tokens(&self) -> TokenStream {
-        let mut s = StructSyntaxBuilder::new(&self.value_struct_name());
 
+    pub fn to_id_builder(&self) -> StructSyntaxBuilder {
+        self.id_builder(&self.ident.id_struct_name())
+    }
+    pub fn to_value_builder(&self) -> StructSyntaxBuilder{
+        self.add_fields(StructSyntaxBuilder::new(&self.ident.value_struct_name()))
+    }
+
+    fn id_builder(&self, name: &str) -> StructSyntaxBuilder {
+        let mut a = StructSyntaxBuilder::new(name);
+        a.add_field(Field::with_decorators("id", "String", vec!["#[serde(deserialize_with = \"thing_to_string\")]"]));
+        a
+    }
+    
+    
+    fn add_fields(&self, mut builder: StructSyntaxBuilder) -> StructSyntaxBuilder {
         for f in self.simple_fields() {
-            s.add_field(Field::new(&f.name, &f.type_));
+            builder.add_field(Field::new(&f.name, &f.type_));
         }
-        s.to_tokens()
+        for f in self.link_single_fields() {
+            if f.prefetch {
+                builder.add_field(Field::new(&f.name, &f.ident.name));
+            } else {
+                ()
+            }
+        }
+        builder
     }
     pub fn to_impl_tokens(&self) -> TokenStream {
         let name_iden = string_to_iden(&self.ident.name);
         let db_iden_str = &self.ident.hash;
-        let id_struct_iden = string_to_iden(&self.id_struct_name());
-        let value_struct_iden = string_to_iden(&self.value_struct_name());
+        let id_struct_iden = string_to_iden(&self.ident.id_struct_name());
+        let value_struct_iden = string_to_iden(&self.ident.value_struct_name());
         
         let fields = self.simple_fields().into_iter().map(|f| format_ident!("{}", f.name)).collect::<Vec<_>>();
 
