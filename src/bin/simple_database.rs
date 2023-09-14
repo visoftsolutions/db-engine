@@ -60,6 +60,7 @@ async fn main() -> surrealdb::Result<()> {
             marketing: true,
         })
     .await?;
+    dbg!(&created[0].id.id, &created[0].id.tb);
     dbg!(created);
 
     // Update a person record with a specific id

@@ -1,4 +1,4 @@
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::{Span, TokenStream, Ident};
 use quote::{format_ident, quote};
 
 pub struct StructSyntaxBuilder {
@@ -19,20 +19,25 @@ impl StructSyntaxBuilder {
         self
     }
 
+    fn name_iden(&self) -> Ident {
+        syn::Ident::new(&&self.name, Span::call_site())
+    }
+
     pub fn to_tokens(&self) -> TokenStream {
-        let name_iden = syn::Ident::new(&&self.name, Span::call_site());
+        let name_iden = self.name_iden();
         let field_defs: Vec<_> = self
             .fields
             .iter()
             .map(|(field_name, field_type)| {
                 let name_iden = format_ident!("{}", field_name);
                 let type_iden = format_ident!("{}", field_type);
-                quote! { #name_iden: #type_iden }
+                quote! { pub #name_iden: #type_iden }
             })
             .collect();
 
         quote! {
-            struct #name_iden {
+            #[derive(Debug, Serialize, Deserialize)]
+            pub struct #name_iden {
                 #(#field_defs,)*
             }
         }
