@@ -56,7 +56,7 @@ impl StructSyntaxBuilder {
         let field_defs: Vec<_> = self.fields.iter().map(Field::to_tokens).collect();
 
         quote! {
-            #[derive(Debug, Serialize, Deserialize)]
+            #[derive(Debug, Serialize, Deserialize, Clone)]
             pub struct #name_iden {
                 #(#field_defs,)*
             }

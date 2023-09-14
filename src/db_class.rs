@@ -1,5 +1,5 @@
 use crate::{
-    db_field::{DbClassField, DbClassLinkSingle},
+    db_field::{DbClassField, DbClassLinkSingle, DbClassSimpleField},
     syntax::struct_builder::{StructSyntaxBuilder, Field},
 };
 
@@ -34,8 +34,17 @@ impl DbClass {
     pub fn id_struct_name(&self) -> String {
         self.ident.name.clone() + "Id"
     }
-    pub fn create_struct_name(&self) -> String {
-        "Create".to_string() + &self.ident.name
+    pub fn value_struct_name(&self) -> String {
+        "Value".to_string() + &self.ident.name
+    }
+    pub fn simple_fields(&self) -> Vec<DbClassSimpleField> {
+        self.fields.iter().filter_map(|f| {
+            if let DbClassField::Simple(i) = f {
+                Some(i.clone())
+            } else {
+                None
+            }
+        }).collect()
     }
 }
 
