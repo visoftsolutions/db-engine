@@ -29,7 +29,7 @@ impl DbManager {
             .map(|c| {
                 let struct_ = StructSyntaxBuilder::from(&c).to_tokens();
                 let id_struct = c.to_id_struct_tokens();
-                let create_struct = c.to_create_struct_tokens();
+                let create_struct = c.to_value_struct_tokens();
                 let impl_ = c.to_impl_tokens();
                 quote! {
                     #id_struct

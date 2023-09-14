@@ -3,7 +3,7 @@ mod types;
 use surrealdb::engine::remote::ws::Ws;
 use surrealdb::opt::auth::Root;
 use surrealdb::Surreal;
-use types::CreateUser;
+use types::ValueUser;
 
 #[tokio::main]
 async fn main() -> surrealdb::Result<()> {
@@ -24,10 +24,13 @@ async fn main() -> surrealdb::Result<()> {
     // Select a specific namespace / database
     db.use_ns("test").use_db("test").await?;
 
-    let result = CreateUser {
+    let mut result = ValueUser {
         age: 20, email: "test@test.gmail".to_string(), name: "Debil".to_string()
     }.db_create(&db).await?.first().unwrap().db_get(&db).await?.unwrap();
-    dbg!(result);
+    dbg!(&result);
+    result.age = 21;
+    let result = result.db_update_get(&db).await?.unwrap();
+    dbg!(&result);
 
     Ok(())
 }
