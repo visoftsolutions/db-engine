@@ -11,9 +11,9 @@ pub enum DbClassExtension {
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub struct DbClass {
-    ident: DbClassIdentifier,
-    extends: Vec<DbClassExtension>,
-    fields: Vec<DbClassField>,
+    pub(crate) ident: DbClassIdentifier,
+    pub(crate) extends: Vec<DbClassExtension>,
+    pub(crate) fields: Vec<DbClassField>,
 }
 
 impl DbClass {
@@ -31,12 +31,18 @@ impl DbClass {
         self.fields.push(field);
         self
     }
+    pub fn id_struct_name(&self) -> String {
+        self.ident.name.clone() + "Id"
+    }
+    pub fn create_struct_name(&self) -> String {
+        "Create".to_string() + &self.ident.name
+    }
 }
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub struct DbClassIdentifier {
     pub name: String,
-    hash: String,
+    pub(crate) hash: String,
 }
 
 impl DbClassIdentifier {
@@ -48,11 +54,11 @@ impl DbClassIdentifier {
     }
 }
 
-impl From<DbClass> for StructSyntaxBuilder {
-    fn from(value: DbClass) -> Self {
+impl From<&DbClass> for StructSyntaxBuilder {
+    fn from(value: &DbClass) -> Self {
         let mut s = StructSyntaxBuilder::new(&value.ident.name);
-        s.add_field("id", "String");
-        for field in value.fields {
+        s.add_field("id", "Thing");
+        for field in &value.fields {
             if let DbClassField::Simple(f) = field {
                 s.add_field(&f.name, &f.type_);
             }

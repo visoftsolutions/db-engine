@@ -26,9 +26,30 @@ impl DbManager {
         let struct_tokens = self
             .classes
             .into_iter()
-            .map(|c| StructSyntaxBuilder::from(c).to_tokens())
+            .map(|c| {
+                let struct_ = StructSyntaxBuilder::from(&c).to_tokens();
+                let id_struct = c.to_id_struct_tokens();
+                let create_struct = c.to_create_struct_tokens();
+                let impl_ = c.to_impl_tokens();
+                quote! {
+                    #id_struct
+                    #struct_
+                    #create_struct
+                    #impl_
+                }
+            })
             .collect::<Vec<_>>();
         quote! {
+            use surrealdb::{Surreal, engine::remote::ws::Client};
+            use serde::{Deserialize, Serialize};
+            use surrealdb::sql::Thing;
+
+            #[derive(Debug, Deserialize)]
+            struct Record {
+                #[allow(dead_code)]
+                id: Thing,
+            }
+
             #(#struct_tokens)*
         }
     }
