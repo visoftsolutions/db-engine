@@ -1,7 +1,7 @@
-use proc_macro2::{Ident, Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
-use crate::{db_class::DbClass, db_field::DbClassField, syntax::string_to_iden};
+use crate::{db_class::DbClass, syntax::string_to_iden};
 
 use super::struct_builder::{Field, StructSyntaxBuilder};
 
@@ -60,9 +60,14 @@ impl DbClass {
         mut builder: StructSyntaxBuilder,
     ) -> StructSyntaxBuilder {
         for f in self.link_single_fields() {
-            builder.add_field(Field::new(
+            builder.add_field(Field::with_decorators(
                 &f.name,
-                format!("DbLink<{}, {}>", f.ident.id_struct_name(), f.ident.name),
+                format!(
+                    "DbLink<{}, {}>",
+                    f.ident.id_struct_name(),
+                    f.ident.value_struct_name()
+                ),
+                vec!["#[serde(serialize_with = \"db_link_to_thing\")]"],
             ));
         }
         builder
@@ -76,11 +81,6 @@ impl DbClass {
         }
         builder
     }
-    fn add_fields(&self, mut builder: StructSyntaxBuilder) -> StructSyntaxBuilder {
-        builder = self.add_simple_fields(builder);
-        builder = self.add_link_single_fields(builder);
-        builder
-    }
     pub fn to_impl_tokens(&self) -> TokenStream {
         let name_iden = string_to_iden(&self.ident.name);
         let db_iden_str = &self.ident.hash;
@@ -88,7 +88,7 @@ impl DbClass {
         let value_struct_iden = string_to_iden(&self.ident.value_struct_name());
         let deserializer_struct_iden = string_to_iden(&self.ident.serializer_struct_name());
 
-        let simple_fields = self
+        let smp_fld = self
             .simple_fields()
             .into_iter()
             .map(|f| format_ident!("{}", f.name))
@@ -98,27 +98,47 @@ impl DbClass {
             .link_single_fields()
             .into_iter()
             .partition(|i| i.prefetch);
-        let lnk_fetch_name = lnk_fetch.iter().map(|f| format_ident!("{}", f.name));
-        let lnk_name = &lnk.iter().map(|f| format_ident!("{}", f.name));
+        let lnk_fetch_name = lnk_fetch
+            .iter()
+            .map(|f| format_ident!("{}", f.name))
+            .collect::<Vec<_>>();
+        let lnk_name = lnk
+            .iter()
+            .map(|f| format_ident!("{}", f.name))
+            .collect::<Vec<_>>();
+        let lnk_all_name = lnk_name
+            .iter()
+            .chain(lnk_fetch_name.iter())
+            .cloned()
+            .collect::<Vec<_>>();
         let lnk_fetch_types = &lnk_fetch
+            .iter()
+            .map(|f| format_ident!("{}", f.ident.id_struct_name()))
+            .collect::<Vec<_>>();
+        let lnk_types = &lnk
             .iter()
             .map(|f| format_ident!("{}", f.ident.id_struct_name()))
             .collect::<Vec<_>>();
 
         quote! {
             impl #value_struct_iden {
-                pub async fn db_create(&self, db: &Surreal<Client>) -> surrealdb::Result<Vec<#id_struct_iden>> {
-                    db.create(#db_iden_str).content(self).await
+                pub async fn db_create(mut self, db: &Surreal<Client>) -> surrealdb::Result<#id_struct_iden> {
+                    #(if let DbLink::New(n) = self.#lnk_all_name {
+                        let result = n.db_create(db).await?;
+                        self.#lnk_all_name = DbLink::Existing(result);
+                    };)*
+                    let result: Vec<#id_struct_iden> = db.create(#id_struct_iden::class_hash()).content(self).await?;
+                    Ok(result.first().unwrap().clone())
                 }
 
-                // pub async fn db_create_get(&self, db: &Surreal<Client>) -> surrealdb::Result<Vec<#name_iden>> {
-                //     db.create(#db_iden_str).content(self).await
-                // }
+                pub async fn db_create_get(mut self, db: &Surreal<Client>) -> surrealdb::Result<#name_iden> {
+                    Ok(self.db_create(db).await?.db_get(&db).await?.unwrap())
+                }
             }
 
             impl #name_iden {
                 pub async fn db_update(&self, db: &Surreal<Client>) -> surrealdb::Result<Option<#id_struct_iden>> {
-                    db.update((#db_iden_str, &self.id)).content(#value_struct_iden::from(self.clone())).await
+                    db.update((#id_struct_iden::class_hash(), &self.id)).content(#value_struct_iden::from(self.clone())).await
                 }
                 // pub async fn db_update_get(&self, db: &Surreal<Client>) -> surrealdb::Result<Option<#name_iden>> {
                 //     db.update((#db_iden_str, &self.id)).content(#value_struct_iden::from(self.clone())).await
@@ -129,12 +149,23 @@ impl DbClass {
                 pub async fn db_get(&self, db: &Surreal<Client>) -> surrealdb::Result<Option<#name_iden>> {
                     let Some(deserialized): Option<#deserializer_struct_iden> = db
                         .select((
-                            #db_iden_str,
+                            #id_struct_iden::class_hash(),
                             &self.id,
                         ))
                         .await? else {return Ok(None)};
-                    #(let #lnk_fetch_name = #lnk_fetch_types{id: deserialized.#lnk_fetch_name.id.to_string()};)*
-                    Ok(None)
+                    #(let Some(#lnk_fetch_name) = #lnk_fetch_types{id: deserialized.#lnk_fetch_name.id.to_string()}.db_get(db).await? else {return Ok(None)};)*
+                    #(let #lnk_name = #lnk_types{id: deserialized.#lnk_name.id.to_string()};)*
+                    Ok(Some(#name_iden{
+                        id: self.id.clone(),
+                        #(#lnk_fetch_name,)*
+                        #(#lnk_name,)*
+                        #(#smp_fld: deserialized.#smp_fld,)*
+                    }))
+                }
+            }
+            impl ClassHash for #id_struct_iden {
+                fn class_hash() -> String {
+                    #db_iden_str.to_string()
                 }
             }
         }
@@ -177,6 +208,12 @@ impl DbClass {
                     #id_struct_iden {
                         id: value.id
                     }
+                }
+            }
+
+            impl Into<Thing> for #id_struct_iden {
+                fn into(self) -> Thing {
+                    Thing::from((#id_struct_iden::class_hash(), self.id))
                 }
             }
 

@@ -59,7 +59,7 @@ async fn main() -> surrealdb::Result<()> {
             },
             marketing: true,
         })
-    .await?;
+        .await?;
     dbg!(&created);
 
     // Update a person record with a specific id
@@ -82,22 +82,24 @@ async fn main() -> surrealdb::Result<()> {
     dbg!(groups);
 
     #[derive(Debug, Serialize, Deserialize)]
-    struct Testing{
+    struct Testing {
         name: String,
-        person: (String, String)
+        person: (String, String),
     }
 
     #[derive(Debug, Serialize, Deserialize)]
-    struct Testing2{
+    struct Testing2 {
         name: String,
-        person: Thing
+        person: Thing,
     }
 
-    
-    let created: Vec<Record> = db.create("testing").content(Testing {
-        name: "Ola".into(),
-        person: (updated.id.tb, updated.id.id.to_string())
-    }).await?;
+    let created: Vec<Record> = db
+        .create("testing")
+        .content(Testing {
+            name: "Ola".into(),
+            person: (updated.id.tb, updated.id.id.to_string()),
+        })
+        .await?;
     dbg!(&created);
     let full: Testing2 = db.select(&created[0].id).await?.unwrap();
     dbg!(&full);

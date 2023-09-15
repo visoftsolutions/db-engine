@@ -16,10 +16,10 @@ impl DbClassSimpleField {
     }
 }
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
-pub struct DbClassLinkSingle{
+pub struct DbClassLinkSingle {
     pub name: String,
     pub ident: DbClassIdentifier,
-    pub prefetch: bool
+    pub prefetch: bool,
 }
 
 impl DbClassLinkSingle {
@@ -27,7 +27,7 @@ impl DbClassLinkSingle {
         DbClassLinkSingle {
             name: name.to_string(),
             ident: ident.clone(),
-            prefetch: false
+            prefetch: false,
         }
         .into()
     }
@@ -35,7 +35,7 @@ impl DbClassLinkSingle {
         DbClassLinkSingle {
             name: name.to_string(),
             ident: ident.clone(),
-            prefetch: true
+            prefetch: true,
         }
         .into()
     }
@@ -56,8 +56,8 @@ impl From<DbClassSimpleField> for DbClassField {
     }
 }
 
-impl From<DbClassLinkSingle > for DbClassField {
-    fn from(value: DbClassLinkSingle ) -> Self {
+impl From<DbClassLinkSingle> for DbClassField {
+    fn from(value: DbClassLinkSingle) -> Self {
         DbClassField::LinkSingle(value)
     }
 }

@@ -1,7 +1,5 @@
-use proc_macro2::{Span, TokenStream, Ident};
+use proc_macro2::{Ident, Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
-use syn::Type;
-
 
 pub struct Field {
     name: String,
@@ -10,7 +8,11 @@ pub struct Field {
 }
 
 impl Field {
-    pub fn with_decorators(name: impl Into<String>, field_type: impl Into<String>, decorators: Vec<impl Into<String>>) -> Self {
+    pub fn with_decorators(
+        name: impl Into<String>,
+        field_type: impl Into<String>,
+        decorators: Vec<impl Into<String>>,
+    ) -> Self {
         Field {
             name: name.into(),
             field_type: field_type.into(),
@@ -23,8 +25,14 @@ impl Field {
     pub fn to_tokens(&self) -> TokenStream {
         let name_iden = format_ident!("{}", self.name);
         // let type_iden = format_ident!("{}", self.field_type);
-        let type_iden: TokenStream = syn::parse_str::<TokenStream>(&self.field_type).unwrap().into_token_stream();
-        let decorators = &self.decorators.iter().map(|d| d.parse::<TokenStream>().unwrap()).collect::<Vec<_>>();
+        let type_iden: TokenStream = syn::parse_str::<TokenStream>(&self.field_type)
+            .unwrap()
+            .into_token_stream();
+        let decorators = &self
+            .decorators
+            .iter()
+            .map(|d| d.parse::<TokenStream>().unwrap())
+            .collect::<Vec<_>>();
         quote! {
             #(#decorators)*
             pub #name_iden: #type_iden

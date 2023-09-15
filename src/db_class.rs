@@ -1,7 +1,7 @@
-use crate::{
-    db_field::{DbClassField, DbClassLinkSingle, DbClassSimpleField},
-    syntax::struct_builder::{StructSyntaxBuilder, Field},
-};
+use std::hash::Hash;
+use std::hash::Hasher;
+
+use crate::db_field::{DbClassField, DbClassLinkSingle, DbClassSimpleField};
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub enum DbClassExtension {
@@ -9,7 +9,7 @@ pub enum DbClassExtension {
     SimpleFill(DbClassLinkSingle),
 }
 
-#[derive(Eq, Hash, PartialEq, Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DbClass {
     pub(crate) ident: DbClassIdentifier,
     pub(crate) extends: Vec<DbClassExtension>,
@@ -32,26 +32,32 @@ impl DbClass {
         self
     }
     pub fn simple_fields(&self) -> Vec<DbClassSimpleField> {
-        self.fields.iter().filter_map(|f| {
-            if let DbClassField::Simple(i) = f {
-                Some(i.clone())
-            } else {
-                None
-            }
-        }).collect()
+        self.fields
+            .iter()
+            .filter_map(|f| {
+                if let DbClassField::Simple(i) = f {
+                    Some(i.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
     pub fn link_single_fields(&self) -> Vec<DbClassLinkSingle> {
-        self.fields.iter().filter_map(|f| {
-            if let DbClassField::LinkSingle(i) = f {
-                Some(i.clone())
-            } else {
-                None
-            }
-        }).collect()
+        self.fields
+            .iter()
+            .filter_map(|f| {
+                if let DbClassField::LinkSingle(i) = f {
+                    Some(i.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 }
 
-#[derive(Eq, Hash, PartialEq, Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DbClassIdentifier {
     pub name: String,
     pub(crate) hash: String,
@@ -75,3 +81,14 @@ impl DbClassIdentifier {
     }
 }
 
+impl Hash for DbClassIdentifier {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.hash.hash(state);
+    }
+}
+
+impl Hash for DbClass {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.ident.hash.hash(state);
+    }
+}
