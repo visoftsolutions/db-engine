@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::HashSet;
 
-use crate::{db_class::DbClass, syntax::struct_builder::StructSyntaxBuilder};
+use crate::{db_class::{DbClass, DbClassIdentifier}, syntax::struct_builder::StructSyntaxBuilder};
 
 pub struct DbManager {
     classes: HashSet<DbClass>,
@@ -15,9 +15,10 @@ impl DbManager {
         }
     }
 
-    pub fn add_class(mut self, class: DbClass) -> Self {
+    pub fn add_class(&mut self, class: DbClass) -> DbClassIdentifier {
+        let ident = class.ident.clone();
         self.classes.insert(class);
-        self
+        ident
     }
 }
 
@@ -30,11 +31,13 @@ impl DbManager {
                 let struct_ = c.to_main_builder().to_tokens();
                 let id_struct = c.to_id_builder().to_tokens();
                 let create_struct = c.to_value_builder().to_tokens();
+                let serializer_struct = c.to_serializer_builder().to_tokens();
                 let impl_ = c.to_impl_tokens();
                 quote! {
                     #id_struct
                     #struct_
                     #create_struct
+                    #serializer_struct
                     #impl_
                 }
             })
@@ -56,6 +59,12 @@ impl DbManager {
             {
                 let original_value: Thing = Deserialize::deserialize(deserializer)?;
                 Ok(original_value.id.to_string())
+            }
+
+            #[derive(Debug, Serialize, Deserialize, Clone)]
+            pub enum DbLink<S, T> {
+                Existing(S),
+                New(T)
             }
 
             #(#struct_tokens)*

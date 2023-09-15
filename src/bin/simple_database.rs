@@ -4,16 +4,16 @@ use surrealdb::opt::auth::Root;
 use surrealdb::sql::Thing;
 use surrealdb::Surreal;
 
-#[derive(Debug, Serialize)]
-struct Name<'a> {
-    first: &'a str,
-    last: &'a str,
+#[derive(Debug, Serialize, Deserialize)]
+struct Name {
+    first: String,
+    last: String,
 }
 
-#[derive(Debug, Serialize)]
-struct Person<'a> {
-    title: &'a str,
-    name: Name<'a>,
+#[derive(Debug, Serialize, Deserialize)]
+struct Person {
+    title: String,
+    name: Name,
     marketing: bool,
 }
 
@@ -52,23 +52,23 @@ async fn main() -> surrealdb::Result<()> {
     let created: Vec<Record> = db
         .create("person")
         .content(Person {
-            title: "Founder & CEO",
+            title: "Founder & CEO".into(),
             name: Name {
-                first: "Tobie",
-                last: "Morgan Hitchcock",
+                first: "Tobie".into(),
+                last: "Morgan Hitchcock".into(),
             },
             marketing: true,
         })
     .await?;
-    dbg!(&created[0].id.id, &created[0].id.tb);
-    dbg!(created);
+    dbg!(&created);
 
     // Update a person record with a specific id
     let updated: Option<Record> = db
-        .update(("person", "jaime"))
+        .update(&created[0].id)
         .merge(Responsibility { marketing: true })
         .await?;
-    dbg!(updated);
+    let updated = updated.unwrap();
+    dbg!(&updated);
 
     // Select all people records
     let people: Vec<Record> = db.select("person").await?;
@@ -80,6 +80,29 @@ async fn main() -> surrealdb::Result<()> {
         .bind(("table", "person"))
         .await?;
     dbg!(groups);
+
+    #[derive(Debug, Serialize, Deserialize)]
+    struct Testing{
+        name: String,
+        person: (String, String)
+    }
+
+    #[derive(Debug, Serialize, Deserialize)]
+    struct Testing2{
+        name: String,
+        person: Thing
+    }
+
+    
+    let created: Vec<Record> = db.create("testing").content(Testing {
+        name: "Ola".into(),
+        person: (updated.id.tb, updated.id.id.to_string())
+    }).await?;
+    dbg!(&created);
+    let full: Testing2 = db.select(&created[0].id).await?.unwrap();
+    dbg!(&full);
+    let person: Option<Person> = db.select(full.person).await?;
+    dbg!(&person);
 
     Ok(())
 }

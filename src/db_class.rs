@@ -70,5 +70,8 @@ impl DbClassIdentifier {
     pub fn value_struct_name(&self) -> String {
         "Value".to_string() + &self.name
     }
+    pub fn serializer_struct_name(&self) -> String {
+        self.name.clone() + "Serializer"
+    }
 }
 

@@ -1,5 +1,7 @@
 use proc_macro2::{Span, TokenStream, Ident};
-use quote::{format_ident, quote};
+use quote::{format_ident, quote, ToTokens};
+use syn::Type;
+
 
 pub struct Field {
     name: String,
@@ -20,7 +22,8 @@ impl Field {
     }
     pub fn to_tokens(&self) -> TokenStream {
         let name_iden = format_ident!("{}", self.name);
-        let type_iden = format_ident!("{}", self.field_type);
+        // let type_iden = format_ident!("{}", self.field_type);
+        let type_iden: TokenStream = syn::parse_str::<TokenStream>(&self.field_type).unwrap().into_token_stream();
         let decorators = &self.decorators.iter().map(|d| d.parse::<TokenStream>().unwrap()).collect::<Vec<_>>();
         quote! {
             #(#decorators)*
