@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::HashSet;
 
-use crate::{db_class::{DbClass, DbClassIdentifier}, syntax::struct_builder::StructSyntaxBuilder};
+use crate::db_class::{DbClass, DbClassIdentifier};
 
 pub struct DbManager {
     classes: HashSet<DbClass>,
@@ -46,7 +46,7 @@ impl DbManager {
             .collect::<Vec<_>>();
         quote! {
             use surrealdb::{Surreal, engine::remote::ws::Client};
-            use serde::{Deserialize, Serialize, Deserializer};
+            use serde::{Deserialize, Serialize, Deserializer, Serializer, ser::Error};
             use surrealdb::sql::Thing;
 
             #[derive(Debug, Deserialize)]
@@ -55,12 +55,26 @@ impl DbManager {
                 id: Thing,
             }
 
+            trait ClassHash{
+                fn class_hash() -> String;
+            }
+
             fn thing_to_string<'de, D>(deserializer: D) -> Result<String, D::Error>
             where
                 D: Deserializer<'de>,
             {
                 let original_value: Thing = Deserialize::deserialize(deserializer)?;
                 Ok(original_value.id.to_string())
+            }
+            fn db_link_to_thing<S, T, U>(db_link: &DbLink<T, U>, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: Serializer,
+                T: Into<Thing>,
+                T: Clone
+            {
+                let DbLink::Existing(e) = db_link else {return Err(Error::custom("Unable to serialize DbLink::Existing"))};
+                let thing: Thing = e.clone().into();
+                thing.serialize(serializer)
             }
 
             #[derive(Debug, Serialize, Deserialize, Clone)]
