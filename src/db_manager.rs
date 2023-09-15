@@ -33,12 +33,14 @@ impl DbManager {
                 let create_struct = c.to_value_builder().to_tokens();
                 let serializer_struct = c.to_serializer_builder().to_tokens();
                 let impl_ = c.to_impl_tokens();
+                let impl_from = c.to_impl_from_tokens();
                 quote! {
                     #id_struct
                     #struct_
                     #create_struct
                     #serializer_struct
                     #impl_
+                    #impl_from
                 }
             })
             .collect::<Vec<_>>();
