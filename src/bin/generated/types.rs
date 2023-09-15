@@ -65,26 +65,19 @@ impl Pet {
             .content(ValuePet::from(self.clone()))
             .await
     }
-    pub async fn db_update_get(
-        &self,
-        db: &Surreal<Client>,
-    ) -> surrealdb::Result<Option<Pet>> {
-        db.update((
-                "8f0d1b30eba5742686a57f8305a2b0455e7148c428fc4b36743a23b97982e6e0",
-                &self.id,
-            ))
-            .content(ValuePet::from(self.clone()))
-            .await
-    }
 }
 impl PetId {
     pub async fn db_get(&self, db: &Surreal<Client>) -> surrealdb::Result<Option<Pet>> {
-        let deserialized: PetSerializer = db
+        let Some(deserialized): Option<PetSerializer> = db
             .select((
                 "8f0d1b30eba5742686a57f8305a2b0455e7148c428fc4b36743a23b97982e6e0",
                 &self.id,
             ))
-            .await;
+            .await? else { return Ok(None) };
+        let owner = UserId {
+            id: deserialized.owner.id.to_string(),
+        };
+        Ok(None)
     }
 }
 impl From<Pet> for ValuePet {
@@ -148,26 +141,16 @@ impl User {
             .content(ValueUser::from(self.clone()))
             .await
     }
-    pub async fn db_update_get(
-        &self,
-        db: &Surreal<Client>,
-    ) -> surrealdb::Result<Option<User>> {
-        db.update((
-                "b512d97e7cbf97c273e4db073bbb547aa65a84589227f8f3d9e4a72b9372a24d",
-                &self.id,
-            ))
-            .content(ValueUser::from(self.clone()))
-            .await
-    }
 }
 impl UserId {
     pub async fn db_get(&self, db: &Surreal<Client>) -> surrealdb::Result<Option<User>> {
-        let deserialized: UserSerializer = db
+        let Some(deserialized): Option<UserSerializer> = db
             .select((
                 "b512d97e7cbf97c273e4db073bbb547aa65a84589227f8f3d9e4a72b9372a24d",
                 &self.id,
             ))
-            .await;
+            .await? else { return Ok(None) };
+        Ok(None)
     }
 }
 impl From<User> for ValueUser {

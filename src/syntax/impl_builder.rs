@@ -99,8 +99,8 @@ impl DbClass {
             .into_iter()
             .partition(|i| i.prefetch);
         let lnk_fetch_name = lnk_fetch.iter().map(|f| format_ident!("{}", f.name));
-        let lnk_name = lnk.iter().map(|f| format_ident!("{}", f.name));
-        let lnk_fetch_types = lnk_fetch
+        let lnk_name = &lnk.iter().map(|f| format_ident!("{}", f.name));
+        let lnk_fetch_types = &lnk_fetch
             .iter()
             .map(|f| format_ident!("{}", f.ident.id_struct_name()))
             .collect::<Vec<_>>();
@@ -120,18 +120,48 @@ impl DbClass {
                 pub async fn db_update(&self, db: &Surreal<Client>) -> surrealdb::Result<Option<#id_struct_iden>> {
                     db.update((#db_iden_str, &self.id)).content(#value_struct_iden::from(self.clone())).await
                 }
-                pub async fn db_update_get(&self, db: &Surreal<Client>) -> surrealdb::Result<Option<#name_iden>> {
-                    db.update((#db_iden_str, &self.id)).content(#value_struct_iden::from(self.clone())).await
-                }
+                // pub async fn db_update_get(&self, db: &Surreal<Client>) -> surrealdb::Result<Option<#name_iden>> {
+                //     db.update((#db_iden_str, &self.id)).content(#value_struct_iden::from(self.clone())).await
+                // }
             }
 
             impl #id_struct_iden {
                 pub async fn db_get(&self, db: &Surreal<Client>) -> surrealdb::Result<Option<#name_iden>> {
-                    let deserialized: #deserializer_struct_iden = db.select((#db_iden_str, &self.id)).await;
-
+                    let Some(deserialized): Option<#deserializer_struct_iden> = db
+                        .select((
+                            #db_iden_str,
+                            &self.id,
+                        ))
+                        .await? else {return Ok(None)};
+                    #(let #lnk_fetch_name = #lnk_fetch_types{id: deserialized.#lnk_fetch_name.id.to_string()};)*
+                    Ok(None)
                 }
             }
+        }
+    }
+    pub fn to_impl_from_tokens(&self) -> TokenStream {
+        let name_iden = string_to_iden(&self.ident.name);
+        let id_struct_iden = string_to_iden(&self.ident.id_struct_name());
+        let value_struct_iden = string_to_iden(&self.ident.value_struct_name());
 
+        let simple_fields = self
+            .simple_fields()
+            .into_iter()
+            .map(|f| format_ident!("{}", f.name))
+            .collect::<Vec<_>>();
+
+        let (lnk_fetch, lnk): (Vec<_>, Vec<_>) = self
+            .link_single_fields()
+            .into_iter()
+            .partition(|i| i.prefetch);
+        let lnk_fetch_name = lnk_fetch.iter().map(|f| format_ident!("{}", f.name));
+        let lnk_name = lnk.iter().map(|f| format_ident!("{}", f.name));
+        let lnk_fetch_types = &lnk_fetch
+            .iter()
+            .map(|f| format_ident!("{}", f.ident.id_struct_name()))
+            .collect::<Vec<_>>();
+
+        quote! {
             impl From<#name_iden> for #value_struct_iden {
                 fn from(value: #name_iden) -> Self {
                     #value_struct_iden {
