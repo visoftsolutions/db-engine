@@ -5,7 +5,9 @@ use surrealdb::opt::auth::Root;
 use surrealdb::Surreal;
 use types::ValueUser;
 
-use crate::types::{DbLink, ValuePet};
+use crate::types::{
+    DbExtend, DbLink, PersonEnumBase, ValueCar, ValueGarage, ValueGuest, ValuePerson,
+};
 
 #[tokio::main]
 async fn main() -> surrealdb::Result<()> {
@@ -27,44 +29,63 @@ async fn main() -> surrealdb::Result<()> {
     // Select a specific namespace / database
     db.use_ns("test").use_db("test").await?;
 
-    let user = ValueUser {
+    let person = ValuePerson {
         age: 20,
-        email: "test@test.gmail".to_string(),
-        name: "Debil".to_string(),
+        name: "Jan Kowalski".to_string(),
     }
     .db_create(&db)
     .await?;
-    dbg!(&user);
-
-    let pet = ValuePet {
-        name: "Azor".to_string(),
-        owner: DbLink::Existing(user),
-        doctor: DbLink::New(vec![ValueUser {
+    dbg!(&person);
+    let user = ValueUser {
+        PersonEnumBase: DbLink::Existing(person),
+        email: "test@test.pl".to_string(),
+    }
+    .db_create_get(&db)
+    .await?;
+    dbg!(user);
+    let guest = ValueGuest {
+        PersonEnumBase: DbLink::New(ValuePerson {
             age: 20,
-            email: "test@test.gmail".to_string(),
-            name: "Konstantyn".to_string(),
-        }]),
-        caretaker: DbLink::New(vec![
-            ValueUser {
-                age: 20,
-                email: "test@test.gmail".to_string(),
-                name: "Konstantyn".to_string(),
+            name: "Mariusz Mariuszewski".to_string(),
+        }),
+        nick: "Marek1980".to_string(),
+    }
+    .db_create_get(&db)
+    .await?;
+    dbg!(&guest);
+    let guest_person: PersonEnumBase = guest.clone().db_extend(&db).await?;
+    dbg!(guest_person);
+
+    let garage = ValueGarage {
+        cars: DbLink::New(vec![
+            ValueCar {
+                owner: DbLink::Existing(guest.PersonEnumBase),
             },
-            ValueUser {
-                age: 20,
-                email: "test@test.gmail".to_string(),
-                name: "Konstantyn".to_string(),
+            ValueCar {
+                owner: DbLink::Existing(
+                    ValueGuest {
+                        nick: "Nested creation".to_string(),
+                        PersonEnumBase: DbLink::New(ValuePerson {
+                            name: "Even more nesting".to_string(),
+                            age: 18,
+                        }),
+                    }
+                    .db_create_get(&db)
+                    .await?
+                    .PersonEnumBase,
+                ),
             },
-            ValueUser {
-                age: 20,
-                email: "test@test.gmail".to_string(),
-                name: "Konstantyn".to_string(),
+            ValueCar {
+                owner: DbLink::New(ValuePerson {
+                    name: "Kacper Kacperski".to_string(),
+                    age: 100,
+                }),
             },
         ]),
     }
     .db_create_get(&db)
     .await?;
-    dbg!(pet);
+    dbg!(garage);
 
     Ok(())
 }
