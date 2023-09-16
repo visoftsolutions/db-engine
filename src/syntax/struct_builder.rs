@@ -81,7 +81,9 @@ impl DbClass {
     pub fn to_main_builder(&self) -> StructSyntaxBuilder {
         let mut builder = self.id_builder(&self.ident.name);
         builder = self.add_simple_fields(builder);
-        self.add_link_single_fields(builder)
+        builder = self.add_link_single_fields(builder);
+        builder = self.add_link_multiple_fields(builder);
+        builder
     }
 
     pub fn to_id_builder(&self) -> StructSyntaxBuilder {
@@ -90,12 +92,15 @@ impl DbClass {
     pub fn to_value_builder(&self) -> StructSyntaxBuilder {
         let mut builder = StructSyntaxBuilder::new(&self.ident.value_struct_name());
         builder = self.add_simple_fields(builder);
-        self.add_link_single_fields_value(builder)
+        builder = self.add_link_single_fields_value(builder);
+        builder = self.add_link_multiple_fields_value(builder);
+        builder
     }
     pub fn to_serializer_builder(&self) -> StructSyntaxBuilder {
         let mut builder = StructSyntaxBuilder::new(&self.ident.serializer_struct_name());
         builder = self.add_simple_fields(builder);
         builder = self.add_link_single_fields_serializer(builder);
+        builder = self.add_link_multiple_fields_serializer(builder);
         builder
     }
 
@@ -150,6 +155,48 @@ impl DbClass {
     ) -> StructSyntaxBuilder {
         for f in self.link_single_fields() {
             builder.add_field(Field::new(&f.name, "Thing"));
+        }
+        builder
+    }
+    fn add_link_multiple_fields(&self, mut builder: StructSyntaxBuilder) -> StructSyntaxBuilder {
+        for f in self.link_multiple_fields() {
+            builder.add_field(Field::new(
+                &f.name,
+                format!(
+                    "Vec<{}> ",
+                    if f.prefetch {
+                        f.ident.name
+                    } else {
+                        f.ident.id_struct_name()
+                    }
+                ),
+            ));
+        }
+        builder
+    }
+    fn add_link_multiple_fields_value(
+        &self,
+        mut builder: StructSyntaxBuilder,
+    ) -> StructSyntaxBuilder {
+        for f in self.link_multiple_fields() {
+            builder.add_field(Field::with_decorators(
+                &f.name,
+                format!(
+                    "DbLink<Vec<{}>, Vec<{}>>",
+                    f.ident.id_struct_name(),
+                    f.ident.value_struct_name()
+                ),
+                vec!["#[serde(serialize_with = \"db_link_to_vec_thing\")]"],
+            ));
+        }
+        builder
+    }
+    fn add_link_multiple_fields_serializer(
+        &self,
+        mut builder: StructSyntaxBuilder,
+    ) -> StructSyntaxBuilder {
+        for f in self.link_multiple_fields() {
+            builder.add_field(Field::new(&f.name, "Vec<Thing>"));
         }
         builder
     }

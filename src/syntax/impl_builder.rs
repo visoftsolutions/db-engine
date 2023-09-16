@@ -43,12 +43,43 @@ impl DbClass {
             .map(|f| format_ident!("{}", f.ident.id_struct_name()))
             .collect::<Vec<_>>();
 
+        let (lm_fetch, lm): (Vec<_>, Vec<_>) = self
+            .link_multiple_fields()
+            .into_iter()
+            .partition(|i| i.prefetch);
+        let lm_fetch_name = lm_fetch
+            .iter()
+            .map(|f| format_ident!("{}", f.name))
+            .collect::<Vec<_>>();
+        let lm_name = lm
+            .iter()
+            .map(|f| format_ident!("{}", f.name))
+            .collect::<Vec<_>>();
+        let lm_all_name = lm_name
+            .iter()
+            .chain(lm_fetch_name.iter())
+            .cloned()
+            .collect::<Vec<_>>();
+        let lm_fetch_types = &lm_fetch
+            .iter()
+            .map(|f| format_ident!("{}", f.ident.id_struct_name()))
+            .collect::<Vec<_>>();
+        let lm_types = &lm
+            .iter()
+            .map(|f| format_ident!("{}", f.ident.id_struct_name()))
+            .collect::<Vec<_>>();
+
         quote! {
             impl #value_struct_iden {
                 pub async fn db_create(mut self, db: &Surreal<Client>) -> surrealdb::Result<#id_struct_iden> {
                     #(if let DbLink::New(n) = self.#lnk_all_name {
                         let result = n.db_create(db).await?;
                         self.#lnk_all_name = DbLink::Existing(result);
+                    };)*
+                    #(if let DbLink::New(v) = self.#lm_all_name {
+                        let futures = v.into_iter().map(|n| n.db_create(db)).collect::<Vec<_>>();
+                        let result = join_all(futures).await.into_iter().collect::<Result<Vec<_>, _>>()?;
+                        self.#lm_all_name = DbLink::Existing(result);
                     };)*
                     let result: Vec<#id_struct_iden> = db.create(#id_struct_iden::class_hash()).content(self).await?;
                     Ok(result.first().unwrap().clone())
@@ -78,10 +109,23 @@ impl DbClass {
                         .await? else {return Ok(None)};
                     #(let Some(#lnk_fetch_name) = #lnk_fetch_types{id: deserialized.#lnk_fetch_name.id.to_string()}.db_get(db).await? else {return Ok(None)};)*
                     #(let #lnk_name = #lnk_types{id: deserialized.#lnk_name.id.to_string()};)*
+                    #(let Some(#lm_fetch_name) = join_all(
+                        deserialized.#lm_fetch_name
+                            .iter()
+                            .map(|i| (|| async {#lm_fetch_types { id: i.id.to_string() }.db_get(db).await})())
+                            .collect::<Vec<_>>()
+                    ).await
+                    .into_iter()
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter()
+                    .collect::<Option<Vec<_>>>() else {return Ok(None)};)*
+                    #(let #lm_name = deserialized.#lm_name.iter().map(|i| #lm_types{id: i.id.to_string()}).collect();)*
                     Ok(Some(#name_iden{
                         id: self.id.clone(),
                         #(#lnk_fetch_name,)*
                         #(#lnk_name,)*
+                        #(#lm_fetch_name,)*
+                        #(#lm_name,)*
                         #(#smp_fld: deserialized.#smp_fld,)*
                     }))
                 }
@@ -114,6 +158,22 @@ impl DbClass {
             .iter()
             .map(|f| format_ident!("{}", f.ident.id_struct_name()))
             .collect::<Vec<_>>();
+        let (lm_fetch, lm): (Vec<_>, Vec<_>) = self
+            .link_multiple_fields()
+            .into_iter()
+            .partition(|i| i.prefetch);
+        let lm_fetch_name = lm_fetch
+            .iter()
+            .map(|f| format_ident!("{}", f.name))
+            .collect::<Vec<_>>();
+        let lm_name = lm
+            .iter()
+            .map(|f| format_ident!("{}", f.name))
+            .collect::<Vec<_>>();
+        let lm_fetch_types = &lm_fetch
+            .iter()
+            .map(|f| format_ident!("{}", f.ident.id_struct_name()))
+            .collect::<Vec<_>>();
 
         quote! {
             impl From<#name_iden> for #value_struct_iden {
@@ -122,6 +182,8 @@ impl DbClass {
                         #(#simple_fields: value.#simple_fields,)*
                         #(#lnk_fetch_name: DbLink::Existing(#lnk_fetch_types{id: value.#lnk_fetch_name.id}), )*
                         #(#lnk_name: DbLink::Existing(value.#lnk_name), )*
+                        #(#lm_fetch_name: DbLink::Existing(value.#lm_fetch_name.into_iter().map(|i| #lm_fetch_types{id: i.id}).collect()), )*
+                        #(#lm_name: DbLink::Existing(value.#lm_name), )*
                     }
                 }
             }

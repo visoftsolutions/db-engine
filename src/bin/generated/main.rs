@@ -39,11 +39,28 @@ async fn main() -> surrealdb::Result<()> {
     let pet = ValuePet {
         name: "Azor".to_string(),
         owner: DbLink::Existing(user),
-        doctor: DbLink::New(ValueUser {
+        doctor: DbLink::New(vec![ValueUser {
             age: 20,
             email: "test@test.gmail".to_string(),
             name: "Konstantyn".to_string(),
-        }),
+        }]),
+        caretaker: DbLink::New(vec![
+            ValueUser {
+                age: 20,
+                email: "test@test.gmail".to_string(),
+                name: "Konstantyn".to_string(),
+            },
+            ValueUser {
+                age: 20,
+                email: "test@test.gmail".to_string(),
+                name: "Konstantyn".to_string(),
+            },
+            ValueUser {
+                age: 20,
+                email: "test@test.gmail".to_string(),
+                name: "Konstantyn".to_string(),
+            },
+        ]),
     }
     .db_create_get(&db)
     .await?;
