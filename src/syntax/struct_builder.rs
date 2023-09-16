@@ -1,6 +1,8 @@
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 
+use crate::db_class::DbClass;
+
 pub struct Field {
     name: String,
     field_type: String,
@@ -72,6 +74,84 @@ impl StructSyntaxBuilder {
                 #(#field_defs,)*
             }
         }
+    }
+}
+
+impl DbClass {
+    pub fn to_main_builder(&self) -> StructSyntaxBuilder {
+        let mut builder = self.id_builder(&self.ident.name);
+        builder = self.add_simple_fields(builder);
+        self.add_link_single_fields(builder)
+    }
+
+    pub fn to_id_builder(&self) -> StructSyntaxBuilder {
+        self.id_builder(&self.ident.id_struct_name())
+    }
+    pub fn to_value_builder(&self) -> StructSyntaxBuilder {
+        let mut builder = StructSyntaxBuilder::new(&self.ident.value_struct_name());
+        builder = self.add_simple_fields(builder);
+        self.add_link_single_fields_value(builder)
+    }
+    pub fn to_serializer_builder(&self) -> StructSyntaxBuilder {
+        let mut builder = StructSyntaxBuilder::new(&self.ident.serializer_struct_name());
+        builder = self.add_simple_fields(builder);
+        builder = self.add_link_single_fields_serializer(builder);
+        builder
+    }
+
+    fn id_builder(&self, name: &str) -> StructSyntaxBuilder {
+        let mut a = StructSyntaxBuilder::new(name);
+        a.add_field(Field::with_decorators(
+            "id",
+            "String",
+            vec!["#[serde(deserialize_with = \"thing_to_string\")]"],
+        ));
+        a
+    }
+    fn add_simple_fields(&self, mut builder: StructSyntaxBuilder) -> StructSyntaxBuilder {
+        for f in self.simple_fields() {
+            builder.add_field(Field::new(&f.name, &f.type_));
+        }
+        builder
+    }
+    fn add_link_single_fields(&self, mut builder: StructSyntaxBuilder) -> StructSyntaxBuilder {
+        for f in self.link_single_fields() {
+            builder.add_field(Field::new(
+                &f.name,
+                if f.prefetch {
+                    f.ident.name
+                } else {
+                    f.ident.id_struct_name()
+                },
+            ));
+        }
+        builder
+    }
+    fn add_link_single_fields_value(
+        &self,
+        mut builder: StructSyntaxBuilder,
+    ) -> StructSyntaxBuilder {
+        for f in self.link_single_fields() {
+            builder.add_field(Field::with_decorators(
+                &f.name,
+                format!(
+                    "DbLink<{}, {}>",
+                    f.ident.id_struct_name(),
+                    f.ident.value_struct_name()
+                ),
+                vec!["#[serde(serialize_with = \"db_link_to_thing\")]"],
+            ));
+        }
+        builder
+    }
+    fn add_link_single_fields_serializer(
+        &self,
+        mut builder: StructSyntaxBuilder,
+    ) -> StructSyntaxBuilder {
+        for f in self.link_single_fields() {
+            builder.add_field(Field::new(&f.name, "Thing"));
+        }
+        builder
     }
 }
 
