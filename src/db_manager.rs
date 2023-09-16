@@ -1,24 +1,78 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use std::collections::HashSet;
 
-use crate::db_class::{DbClass, DbClassIdentifier};
+use crate::{
+    db_class::{DbClass, DbClassExtension, DbClassIdentifier},
+    db_enum::DbEnum,
+};
 
 pub struct DbManager {
-    classes: HashSet<DbClass>,
+    classes: Vec<DbClass>,
+    enums: Vec<DbEnum>,
 }
 
 impl DbManager {
     pub fn new() -> Self {
         DbManager {
-            classes: HashSet::new(),
+            classes: vec![],
+            enums: vec![],
         }
     }
 
     pub fn add_class(&mut self, class: DbClass) -> DbClassIdentifier {
         let ident = class.ident.clone();
-        self.classes.insert(class);
+        self.classes.push(class);
         ident
+    }
+
+    pub fn add_enum(
+        &mut self,
+        name: impl Into<String>,
+        base: &DbClassIdentifier,
+        members: Vec<&DbClassIdentifier>,
+    ) {
+        let name: String = name.into();
+        let base_class = self
+            .classes
+            .iter_mut()
+            .find(|m| m.ident.hash == base.hash)
+            .unwrap();
+        base_class.extends_self(DbEnum::base_name(name.clone()));
+        let mut enum_ = DbEnum::new(name, base_class.clone());
+        for m in members {
+            enum_.add_type(&m);
+        }
+
+        self.enums.push(enum_);
+    }
+    pub fn add_extension(
+        &mut self,
+        base: &DbClassIdentifier,
+        name: impl Into<String>,
+        ident: &DbClassIdentifier,
+    ) {
+        let name: String = name.into();
+        let base_class = self
+            .classes
+            .iter()
+            .find(|m| m.ident.hash == base.hash)
+            .unwrap()
+            .clone();
+        let class = self
+            .classes
+            .iter_mut()
+            .find(|m| m.ident.hash == ident.hash)
+            .unwrap();
+        let fields = class.simple_fields();
+        let simple = base_class
+            .simple_fields()
+            .iter()
+            .all(|f| fields.contains(f));
+        class.extends(DbClassExtension(
+            DbEnum::base_name(name.clone()),
+            base_class,
+            simple,
+        ))
     }
 }
 
@@ -44,7 +98,9 @@ impl DbManager {
                 }
             })
             .collect::<Vec<_>>();
+        let enum_tokens = self.enums.iter().map(|e| e.to_tokens()).collect::<Vec<_>>();
         quote! {
+            use async_trait::async_trait;
             use surrealdb::{Surreal, engine::remote::ws::Client};
             use serde::{Deserialize, Serialize, Deserializer, Serializer, ser::Error};
             use surrealdb::sql::Thing;
@@ -56,8 +112,20 @@ impl DbManager {
                 id: Thing,
             }
 
-            trait ClassHash{
+            pub trait ClassHash{
                 fn class_hash() -> String;
+            }
+
+            #[async_trait]
+            pub trait DbExtend<T> {
+                async fn db_extend(self, db: &Surreal<Client>) -> surrealdb::Result<T>;
+            }
+
+            #[async_trait]
+            impl<T: Send> DbExtend<T> for T {
+                async fn db_extend(self, _db: &Surreal<Client>) -> surrealdb::Result<T>{
+                    Ok(self)
+                }
             }
 
             fn thing_to_string<'de, D>(deserializer: D) -> Result<String, D::Error>
@@ -95,6 +163,9 @@ impl DbManager {
             }
 
             #(#struct_tokens)*
+            #(#enum_tokens)*
+
+
         }
     }
 }

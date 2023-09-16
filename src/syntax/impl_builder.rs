@@ -1,7 +1,10 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
-use crate::{db_class::DbClass, syntax::string_to_iden};
+use crate::{
+    db_class::{DbClass, DbClassExtension},
+    syntax::string_to_iden,
+};
 
 impl DbClass {
     pub fn to_impl_tokens(&self) -> TokenStream {
@@ -11,63 +14,19 @@ impl DbClass {
         let value_struct_iden = string_to_iden(&self.ident.value_struct_name());
         let deserializer_struct_iden = string_to_iden(&self.ident.serializer_struct_name());
 
-        let smp_fld = self
-            .simple_fields()
-            .into_iter()
-            .map(|f| format_ident!("{}", f.name))
-            .collect::<Vec<_>>();
-
-        let (lnk_fetch, lnk): (Vec<_>, Vec<_>) = self
-            .link_single_fields()
-            .into_iter()
-            .partition(|i| i.prefetch);
-        let lnk_fetch_name = lnk_fetch
-            .iter()
-            .map(|f| format_ident!("{}", f.name))
-            .collect::<Vec<_>>();
-        let lnk_name = lnk
-            .iter()
-            .map(|f| format_ident!("{}", f.name))
-            .collect::<Vec<_>>();
-        let lnk_all_name = lnk_name
-            .iter()
-            .chain(lnk_fetch_name.iter())
-            .cloned()
-            .collect::<Vec<_>>();
-        let lnk_fetch_types = &lnk_fetch
-            .iter()
-            .map(|f| format_ident!("{}", f.ident.id_struct_name()))
-            .collect::<Vec<_>>();
-        let lnk_types = &lnk
-            .iter()
-            .map(|f| format_ident!("{}", f.ident.id_struct_name()))
-            .collect::<Vec<_>>();
-
-        let (lm_fetch, lm): (Vec<_>, Vec<_>) = self
-            .link_multiple_fields()
-            .into_iter()
-            .partition(|i| i.prefetch);
-        let lm_fetch_name = lm_fetch
-            .iter()
-            .map(|f| format_ident!("{}", f.name))
-            .collect::<Vec<_>>();
-        let lm_name = lm
-            .iter()
-            .map(|f| format_ident!("{}", f.name))
-            .collect::<Vec<_>>();
-        let lm_all_name = lm_name
-            .iter()
-            .chain(lm_fetch_name.iter())
-            .cloned()
-            .collect::<Vec<_>>();
-        let lm_fetch_types = &lm_fetch
-            .iter()
-            .map(|f| format_ident!("{}", f.ident.id_struct_name()))
-            .collect::<Vec<_>>();
-        let lm_types = &lm
-            .iter()
-            .map(|f| format_ident!("{}", f.ident.id_struct_name()))
-            .collect::<Vec<_>>();
+        let (
+            smp_fld,
+            lnk_fetch_name,
+            lnk_name,
+            lnk_all_name,
+            lnk_fetch_types,
+            lnk_types,
+            lm_fetch_name,
+            lm_name,
+            lm_all_name,
+            lm_fetch_types,
+            lm_types,
+        ) = self.field_idents();
 
         quote! {
             impl #value_struct_iden {
@@ -137,49 +96,93 @@ impl DbClass {
             }
         }
     }
+    fn extensions_tokens(&self) -> TokenStream {
+        let exts = self
+            .extends
+            .clone()
+            .into_iter()
+            .map(|e| self.extension_tokens(e))
+            .collect::<Vec<_>>();
+        quote! {
+            #(#exts)*
+        }
+    }
+    fn extension_tokens(&self, ext: DbClassExtension) -> TokenStream {
+        if ext.2 {
+            return self.self_extension_tokens(ext.0);
+        }
+        let name_iden = string_to_iden(&self.ident.name);
+        let ext_name = string_to_iden(&ext.0);
+        let (common_fields, extend_fields): (Vec<_>, Vec<_>) = ext
+            .1
+            .simple_fields()
+            .into_iter()
+            .partition(|f| self.simple_fields().contains(f));
+        let cmn_f = common_fields
+            .into_iter()
+            .map(|f| format_ident!("{}", f.name))
+            .collect::<Vec<_>>();
+        let ext_f = extend_fields
+            .into_iter()
+            .map(|f| format_ident!("{}", f.name))
+            .collect::<Vec<_>>();
+        quote! {
+            #[async_trait]
+            impl DbExtend<#ext_name> for #name_iden {
+                async fn db_extend(self, db: &Surreal<Client>) -> surrealdb::Result<#ext_name> {
+                    let base = self.#ext_name.db_get(db).await?.unwrap();
+                    Ok(#ext_name {
+                        #(#cmn_f: self.#cmn_f,)*
+                        #(#ext_f: base.#ext_f,)*
+                    })
+                }
+            }
+        }
+    }
+    fn self_extension_tokens(&self, name: String) -> TokenStream {
+        let name_iden = string_to_iden(&self.ident.name);
+        let ext_name = string_to_iden(&name);
+        let smp_fld = self
+            .simple_fields()
+            .into_iter()
+            .map(|f| format_ident!("{}", f.name))
+            .collect::<Vec<_>>();
+        quote! {
+            #[async_trait]
+            impl DbExtend<#ext_name> for #name_iden {
+                async fn db_extend(self, db: &Surreal<Client>) -> surrealdb::Result<#ext_name> {
+                    Ok(#ext_name {
+                        #(#smp_fld: self.#smp_fld, )*
+                    })
+                }
+            }
+        }
+    }
     pub fn to_impl_from_tokens(&self) -> TokenStream {
         let name_iden = string_to_iden(&self.ident.name);
         let id_struct_iden = string_to_iden(&self.ident.id_struct_name());
         let value_struct_iden = string_to_iden(&self.ident.value_struct_name());
 
-        let simple_fields = self
-            .simple_fields()
-            .into_iter()
-            .map(|f| format_ident!("{}", f.name))
-            .collect::<Vec<_>>();
+        let extensions_tokens = self.extensions_tokens();
 
-        let (lnk_fetch, lnk): (Vec<_>, Vec<_>) = self
-            .link_single_fields()
-            .into_iter()
-            .partition(|i| i.prefetch);
-        let lnk_fetch_name = lnk_fetch.iter().map(|f| format_ident!("{}", f.name));
-        let lnk_name = lnk.iter().map(|f| format_ident!("{}", f.name));
-        let lnk_fetch_types = &lnk_fetch
-            .iter()
-            .map(|f| format_ident!("{}", f.ident.id_struct_name()))
-            .collect::<Vec<_>>();
-        let (lm_fetch, lm): (Vec<_>, Vec<_>) = self
-            .link_multiple_fields()
-            .into_iter()
-            .partition(|i| i.prefetch);
-        let lm_fetch_name = lm_fetch
-            .iter()
-            .map(|f| format_ident!("{}", f.name))
-            .collect::<Vec<_>>();
-        let lm_name = lm
-            .iter()
-            .map(|f| format_ident!("{}", f.name))
-            .collect::<Vec<_>>();
-        let lm_fetch_types = &lm_fetch
-            .iter()
-            .map(|f| format_ident!("{}", f.ident.id_struct_name()))
-            .collect::<Vec<_>>();
-
+        let (
+            smp_fld,
+            lnk_fetch_name,
+            lnk_name,
+            _lnk_all_name,
+            lnk_fetch_types,
+            _lnk_types,
+            lm_fetch_name,
+            lm_name,
+            _lm_all_name,
+            lm_fetch_types,
+            _lm_types,
+        ) = self.field_idents();
         quote! {
             impl From<#name_iden> for #value_struct_iden {
                 fn from(value: #name_iden) -> Self {
                     #value_struct_iden {
-                        #(#simple_fields: value.#simple_fields,)*
+                        #(#smp_fld: value.#smp_fld,)*
                         #(#lnk_fetch_name: DbLink::Existing(#lnk_fetch_types{id: value.#lnk_fetch_name.id}), )*
                         #(#lnk_name: DbLink::Existing(value.#lnk_name), )*
                         #(#lm_fetch_name: DbLink::Existing(value.#lm_fetch_name.into_iter().map(|i| #lm_fetch_types{id: i.id}).collect()), )*
@@ -202,6 +205,94 @@ impl DbClass {
                 }
             }
 
+            #extensions_tokens
+
         }
+    }
+    fn field_idents(
+        &self,
+    ) -> (
+        Vec<proc_macro2::Ident>,
+        Vec<proc_macro2::Ident>,
+        Vec<proc_macro2::Ident>,
+        Vec<proc_macro2::Ident>,
+        Vec<proc_macro2::Ident>,
+        Vec<proc_macro2::Ident>,
+        Vec<proc_macro2::Ident>,
+        Vec<proc_macro2::Ident>,
+        Vec<proc_macro2::Ident>,
+        Vec<proc_macro2::Ident>,
+        Vec<proc_macro2::Ident>,
+    ) {
+        let smp_fld = self
+            .simple_fields()
+            .into_iter()
+            .map(|f| format_ident!("{}", f.name))
+            .collect::<Vec<_>>();
+
+        let (lnk_fetch, lnk): (Vec<_>, Vec<_>) = self
+            .link_single_fields()
+            .into_iter()
+            .partition(|i| i.prefetch);
+        let lnk_fetch_name = lnk_fetch
+            .iter()
+            .map(|f| format_ident!("{}", f.name))
+            .collect::<Vec<_>>();
+        let lnk_name = lnk
+            .iter()
+            .map(|f| format_ident!("{}", f.name))
+            .collect::<Vec<_>>();
+        let lnk_all_name = lnk_name
+            .iter()
+            .chain(lnk_fetch_name.iter())
+            .cloned()
+            .collect::<Vec<_>>();
+        let lnk_fetch_types = lnk_fetch
+            .iter()
+            .map(|f| format_ident!("{}", f.ident.id_struct_name()))
+            .collect::<Vec<_>>();
+        let lnk_types = lnk
+            .iter()
+            .map(|f| format_ident!("{}", f.ident.id_struct_name()))
+            .collect::<Vec<_>>();
+
+        let (lm_fetch, lm): (Vec<_>, Vec<_>) = self
+            .link_multiple_fields()
+            .into_iter()
+            .partition(|i| i.prefetch);
+        let lm_fetch_name = lm_fetch
+            .iter()
+            .map(|f| format_ident!("{}", f.name))
+            .collect::<Vec<_>>();
+        let lm_name = lm
+            .iter()
+            .map(|f| format_ident!("{}", f.name))
+            .collect::<Vec<_>>();
+        let lm_all_name = lm_name
+            .iter()
+            .chain(lm_fetch_name.iter())
+            .cloned()
+            .collect::<Vec<_>>();
+        let lm_fetch_types = lm_fetch
+            .iter()
+            .map(|f| format_ident!("{}", f.ident.id_struct_name()))
+            .collect::<Vec<_>>();
+        let lm_types = lm
+            .iter()
+            .map(|f| format_ident!("{}", f.ident.id_struct_name()))
+            .collect::<Vec<_>>();
+        (
+            smp_fld,
+            lnk_fetch_name,
+            lnk_name,
+            lnk_all_name,
+            lnk_fetch_types,
+            lnk_types,
+            lm_fetch_name,
+            lm_name,
+            lm_all_name,
+            lm_fetch_types,
+            lm_types,
+        )
     }
 }

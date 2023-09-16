@@ -7,22 +7,22 @@ use db_engine::{
 };
 
 fn main() {
-    let mut manager = DbManager::new();
-    let user = manager.add_class(
-        DbClass::with_name("User")
+    let mut mng = DbManager::new();
+    let person = mng.add_class(
+        DbClass::with_name("Person")
             .add_field(SF::new("name", "String"))
-            .add_field(SF::new("email", "String"))
             .add_field(SF::new("age", "u16")),
     );
-    let _pet = manager.add_class(
-        DbClass::with_name("Pet")
-            .add_field(SF::new("name", "String"))
-            .add_field(LnS::new_prefetch("owner", &user))
-            .add_field(LnM::new_prefetch("doctor", &user))
-            .add_field(LnM::new("caretaker", &user)),
-    );
+    let user = mng.add_class(DbClass::with_name("User").add_field(SF::new("email", "String")));
+    let guest = mng.add_class(DbClass::with_name("Guest").add_field(SF::new("nick", "String")));
+    let car = mng.add_class(DbClass::with_name("Car").add_field(LnS::new("owner", &person)));
+    let _garage =
+        mng.add_class(DbClass::with_name("Garage").add_field(LnM::new_prefetch("cars", &car)));
+    mng.add_enum("PersonEnum", &person, vec![&user, &guest]);
+    mng.add_extension(&person, "PersonEnum", &user);
+    mng.add_extension(&person, "PersonEnum", &guest);
 
-    let tokens = manager.to_tokens();
+    let tokens = mng.to_tokens();
     let code = prettyplease::unparse(&syn::parse2(tokens).unwrap());
     let path = "src/bin/generated/types.rs";
     File::create(path)

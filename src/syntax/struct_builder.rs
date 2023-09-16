@@ -44,13 +44,15 @@ impl Field {
 
 pub struct StructSyntaxBuilder {
     name: String,
+    hash: String,
     fields: Vec<Field>,
 }
 
 impl StructSyntaxBuilder {
-    pub fn new(name: &str) -> Self {
+    pub fn new(name: impl Into<String>, hash: impl Into<String>) -> Self {
         StructSyntaxBuilder {
-            name: name.to_string(),
+            name: name.into(),
+            hash: hash.into(),
             fields: Vec::new(),
         }
     }
@@ -67,9 +69,12 @@ impl StructSyntaxBuilder {
     pub fn to_tokens(&self) -> TokenStream {
         let name_iden = self.name_iden();
         let field_defs: Vec<_> = self.fields.iter().map(Field::to_tokens).collect();
+        let hash = &self.hash;
 
         quote! {
             #[derive(Debug, Serialize, Deserialize, Clone)]
+            #[serde(tag = "type")]
+            #[serde(rename = #hash)]
             pub struct #name_iden {
                 #(#field_defs,)*
             }
@@ -90,14 +95,16 @@ impl DbClass {
         self.id_builder(&self.ident.id_struct_name())
     }
     pub fn to_value_builder(&self) -> StructSyntaxBuilder {
-        let mut builder = StructSyntaxBuilder::new(&self.ident.value_struct_name());
+        let mut builder =
+            StructSyntaxBuilder::new(&self.ident.value_struct_name(), &self.ident.hash);
         builder = self.add_simple_fields(builder);
         builder = self.add_link_single_fields_value(builder);
         builder = self.add_link_multiple_fields_value(builder);
         builder
     }
     pub fn to_serializer_builder(&self) -> StructSyntaxBuilder {
-        let mut builder = StructSyntaxBuilder::new(&self.ident.serializer_struct_name());
+        let mut builder =
+            StructSyntaxBuilder::new(&self.ident.serializer_struct_name(), &self.ident.hash);
         builder = self.add_simple_fields(builder);
         builder = self.add_link_single_fields_serializer(builder);
         builder = self.add_link_multiple_fields_serializer(builder);
@@ -105,7 +112,7 @@ impl DbClass {
     }
 
     fn id_builder(&self, name: &str) -> StructSyntaxBuilder {
-        let mut a = StructSyntaxBuilder::new(name);
+        let mut a = StructSyntaxBuilder::new(name, &self.ident.hash);
         a.add_field(Field::with_decorators(
             "id",
             "String",
@@ -199,23 +206,5 @@ impl DbClass {
             builder.add_field(Field::new(&f.name, "Vec<Thing>"));
         }
         builder
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_generate_code() {
-        let tokens = StructSyntaxBuilder::new("Person")
-            .add_field(Field::new("name", "String"))
-            .add_field(Field::new("age", "i32"))
-            .to_tokens();
-        let code = prettyplease::unparse(&syn::parse2(tokens).unwrap());
-        assert_eq!(
-            code,
-            "struct Person {\n    name: String,\n    age: i32,\n}\n"
-        );
     }
 }

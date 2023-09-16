@@ -4,11 +4,14 @@ use std::hash::Hasher;
 use crate::db_field::DbClassLinkSingle;
 use crate::db_field::{DbClassField, DbClassLinkMultiple, DbClassSimpleField};
 
+// #[derive(Eq, Hash, PartialEq, Debug, Clone)]
+// pub enum DbClassExtension {
+//     // Custom(DbClassIdentifier),
+//     SimpleFill(String, DbClass),
+// }
+
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
-pub enum DbClassExtension {
-    Custom(DbClassIdentifier),
-    SimpleFill(DbClassLinkMultiple),
-}
+pub struct DbClassExtension(pub String, pub DbClass, pub bool);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DbClass {
@@ -31,6 +34,17 @@ impl DbClass {
     pub fn add_field(mut self, field: DbClassField) -> Self {
         self.fields.push(field);
         self
+    }
+    pub fn extends(&mut self, ext: DbClassExtension) {
+        if !ext.2 {
+            self.fields
+                .push(DbClassLinkSingle::new(&ext.0, &ext.1.ident));
+        }
+        self.extends.push(ext);
+    }
+    pub fn extends_self(&mut self, name: impl Into<String>) {
+        let c = self.clone();
+        self.extends(DbClassExtension(name.into(), c, true))
     }
     pub fn simple_fields(&self) -> Vec<DbClassSimpleField> {
         self.fields

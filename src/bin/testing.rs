@@ -15,8 +15,7 @@ struct Two {}
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
 enum MyEnum {
-    #[serde(rename = "jeden")]
-    Variant1(One),
+    Jeden(One),
     #[serde(rename = "dwa")]
     Variant2(Two),
 }
