@@ -15,4 +15,5 @@ prettyplease = "0.2"
 proc-macro2 = "1"
 sha256 = "1.4"
 serde_json = "1.0.107"
+futures = "0.3.28"
 

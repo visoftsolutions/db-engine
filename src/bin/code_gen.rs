@@ -2,8 +2,8 @@ use std::fs::File;
 use std::io::Write;
 
 use db_engine::{
-    db_class::DbClass, db_field::DbClassLinkSingle as LnS, db_field::DbClassSimpleField as SF,
-    db_manager::DbManager,
+    db_class::DbClass, db_field::DbClassLinkMultiple as LnM, db_field::DbClassLinkSingle as LnS,
+    db_field::DbClassSimpleField as SF, db_manager::DbManager,
 };
 
 fn main() {
@@ -18,7 +18,8 @@ fn main() {
         DbClass::with_name("Pet")
             .add_field(SF::new("name", "String"))
             .add_field(LnS::new_prefetch("owner", &user))
-            .add_field(LnS::new("doctor", &user)),
+            .add_field(LnM::new_prefetch("doctor", &user))
+            .add_field(LnM::new("caretaker", &user)),
     );
 
     let tokens = manager.to_tokens();

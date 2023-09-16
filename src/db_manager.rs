@@ -48,6 +48,7 @@ impl DbManager {
             use surrealdb::{Surreal, engine::remote::ws::Client};
             use serde::{Deserialize, Serialize, Deserializer, Serializer, ser::Error};
             use surrealdb::sql::Thing;
+            use futures::future::join_all;
 
             #[derive(Debug, Deserialize)]
             struct Record {
@@ -72,9 +73,19 @@ impl DbManager {
                 T: Into<Thing>,
                 T: Clone
             {
-                let DbLink::Existing(e) = db_link else {return Err(Error::custom("Unable to serialize DbLink::Existing"))};
+                let DbLink::Existing(e) = db_link else {return Err(Error::custom("Unable to serialize DbLink::New"))};
                 let thing: Thing = e.clone().into();
                 thing.serialize(serializer)
+            }
+            fn db_link_to_vec_thing<S, T, U>(db_link: &DbLink<Vec<T>, U>, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: Serializer,
+                T: Into<Thing>,
+                T: Clone
+            {
+                let DbLink::Existing(e) = db_link else {return Err(Error::custom("Unable to serialize DbLink::New"))};
+                let vec: Vec<Thing> = e.iter().map(|i| i.clone().into()).collect();
+                vec.serialize(serializer)
             }
 
             #[derive(Debug, Serialize, Deserialize, Clone)]
