@@ -1,12 +1,13 @@
 use std::hash::Hash;
 use std::hash::Hasher;
 
-use crate::db_field::{DbClassField, DbClassLinkSingle, DbClassSimpleField};
+use crate::db_field::DbClassLinkSingle;
+use crate::db_field::{DbClassField, DbClassLinkMultiple, DbClassSimpleField};
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub enum DbClassExtension {
     Custom(DbClassIdentifier),
-    SimpleFill(DbClassLinkSingle),
+    SimpleFill(DbClassLinkMultiple),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,6 +49,18 @@ impl DbClass {
             .iter()
             .filter_map(|f| {
                 if let DbClassField::LinkSingle(i) = f {
+                    Some(i.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+    pub fn link_multiple_fields(&self) -> Vec<DbClassLinkMultiple> {
+        self.fields
+            .iter()
+            .filter_map(|f| {
+                if let DbClassField::LinkMultiple(i) = f {
                     Some(i.clone())
                 } else {
                     None

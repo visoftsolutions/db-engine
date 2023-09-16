@@ -16,6 +16,31 @@ impl DbClassSimpleField {
     }
 }
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
+pub struct DbClassLinkMultiple {
+    pub name: String,
+    pub ident: DbClassIdentifier,
+    pub prefetch: bool,
+}
+
+impl DbClassLinkMultiple {
+    pub fn new(name: &str, ident: &DbClassIdentifier) -> DbClassField {
+        DbClassLinkMultiple {
+            name: name.to_string(),
+            ident: ident.clone(),
+            prefetch: false,
+        }
+        .into()
+    }
+    pub fn new_prefetch(name: &str, ident: &DbClassIdentifier) -> DbClassField {
+        DbClassLinkMultiple {
+            name: name.to_string(),
+            ident: ident.clone(),
+            prefetch: true,
+        }
+        .into()
+    }
+}
+#[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub struct DbClassLinkSingle {
     pub name: String,
     pub ident: DbClassIdentifier,
@@ -40,8 +65,6 @@ impl DbClassLinkSingle {
         .into()
     }
 }
-#[derive(Eq, Hash, PartialEq, Debug, Clone)]
-pub struct DbClassLinkMultiple(DbClassIdentifier);
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub enum DbClassField {
@@ -59,5 +82,11 @@ impl From<DbClassSimpleField> for DbClassField {
 impl From<DbClassLinkSingle> for DbClassField {
     fn from(value: DbClassLinkSingle) -> Self {
         DbClassField::LinkSingle(value)
+    }
+}
+
+impl From<DbClassLinkMultiple> for DbClassField {
+    fn from(value: DbClassLinkMultiple) -> Self {
+        DbClassField::LinkMultiple(value)
     }
 }
